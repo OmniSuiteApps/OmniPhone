@@ -2,3 +2,8 @@
 build/
 local.properties
 .kotlin/
+
+# Signature de la version release : même clé que Lanceur
+keystore.properties
+*.jks
+*.keystore

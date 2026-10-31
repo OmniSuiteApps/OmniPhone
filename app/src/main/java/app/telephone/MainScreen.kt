@@ -17,6 +17,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -290,7 +293,8 @@ private fun FavoritesCard(contacts: List<Contact>, favorites: List<String>, onFa
                 shape = CardShape,
             )
             Spacer(Modifier.height(8.dp))
-            LazyColumn {
+            // Les derniers contacts restent au-dessus de la barre de navigation
+            LazyColumn(contentPadding = WindowInsets.navigationBars.asPaddingValues()) {
                 items(contacts.filter { Favorites.key(it) !in favorites && searchKey(it.name).contains(key) }, key = Favorites::key) { contact ->
                     PersonRow(contact.name, contactSubtitle(contact), onClick = { picking = false; onFavorites(favorites + Favorites.key(contact)) }) {
                         Avatar(contact.photo, contact.name)
