@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -38,20 +39,20 @@ private fun decode(context: Context, uri: String): ImageBitmap? = photos.get(uri
 }.getOrNull()?.also { photos.put(uri, it) }
 
 /**
- * Rond de 40 dp : la photo du contact, sinon son initiale. [badge] se pose en bas à droite, dans un petit rond détouré
+ * Rond ([size], 40 dp par défaut) : la photo du contact, sinon son initiale. [badge] se pose en bas à droite, dans un petit rond détouré
  * de la couleur du fond.
  */
 @Composable
-fun Avatar(photo: String?, name: String?, badge: (@Composable () -> Unit)? = null, badgeColor: Color = MaterialTheme.colorScheme.secondaryContainer) {
+fun Avatar(photo: String?, name: String?, size: Dp = 40.dp, badge: (@Composable () -> Unit)? = null, badgeColor: Color = MaterialTheme.colorScheme.secondaryContainer) {
     val context = LocalContext.current
     val image by produceState(photo?.let { photos.get(it) }, photo) {
         if (photo != null && value == null) value = withContext(Dispatchers.IO) { decode(context, photo) }
     }
-    Box(Modifier.size(40.dp)) {
-        Box(Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
+    Box(Modifier.size(size)) {
+        Box(Modifier.size(size).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
             val bitmap = image
             when {
-                bitmap != null -> Image(bitmap, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(40.dp))
+                bitmap != null -> Image(bitmap, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(size))
                 !name.isNullOrBlank() -> Text(name.take(1).uppercase(), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
                 else -> Text("#", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
             }
