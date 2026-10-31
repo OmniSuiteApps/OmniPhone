@@ -58,7 +58,9 @@ object Phone {
         return context.contentResolver.query(p, projection, null, null, "${CommonDataKinds.Phone.DISPLAY_NAME_PRIMARY} COLLATE LOCALIZED ASC")?.use { c ->
             buildList {
                 while (c.moveToNext()) {
-                    val label = CommonDataKinds.Phone.getTypeLabel(context.resources, c.getInt(3), c.getString(4)).toString()
+                    // Type « personnalisé » sans nom : rien plutôt que « Custom »
+                    val custom = c.getInt(3) == CommonDataKinds.Phone.TYPE_CUSTOM && c.getString(4).isNullOrBlank()
+                    val label = if (custom) "" else CommonDataKinds.Phone.getTypeLabel(context.resources, c.getInt(3), c.getString(4)).toString()
                     add(Contact(c.getLong(0), c.getString(1).orEmpty(), c.getString(2).orEmpty(), label))
                 }
             }

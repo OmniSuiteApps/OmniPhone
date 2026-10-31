@@ -210,7 +210,7 @@ private fun Contacts(refresh: Int, onRequestPermissions: () -> Unit) {
     }
     LazyColumn {
         items(shown, key = { "${it.id}-${it.number}" }) { contact ->
-            PersonRow(contact.name, "${contact.label} · ${Phone.format(contact.number)}", onClick = { Phone.call(context, contact.number) }) {
+            PersonRow(contact.name, listOf(contact.label, Phone.format(contact.number)).filter { it.isNotEmpty() }.joinToString(" · "), onClick = { Phone.call(context, contact.number) }) {
                 Text(contact.name.take(1).uppercase(), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
             }
         }
