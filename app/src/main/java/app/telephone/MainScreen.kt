@@ -12,7 +12,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -21,6 +23,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -46,6 +49,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -55,10 +59,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.Normalizer
+import kotlin.math.roundToInt
 
 private enum class Tab(private val fr: String, private val en: String, val icon: ImageVector) {
     RECENTS("Récents", "Recents", Icons.Outlined.History),
@@ -136,9 +143,7 @@ private fun PersonRow(title: String, subtitle: String, onClick: () -> Unit, titl
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
-            leading()
-        }
+        leading()
         Spacer(Modifier.width(16.dp))
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.titleMedium, color = titleColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -175,7 +180,14 @@ private fun Recents(refresh: Int, onRequestPermissions: () -> Unit) {
                 titleColor = if (missed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
                 onClick = { Phone.call(context, call.number) },
             ) {
-                Icon(icon, contentDescription = kind, tint = if (missed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(20.dp))
+                Avatar(
+                    photo = call.photo,
+                    name = call.name,
+                    badgeColor = if (missed) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.secondaryContainer,
+                    badge = {
+                        Icon(icon, contentDescription = kind, tint = if (missed) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(12.dp))
+                    },
+                )
             }
         }
     }
@@ -208,10 +220,40 @@ private fun Contacts(refresh: Int, onRequestPermissions: () -> Unit) {
         if (key.isEmpty()) contacts
         else contacts.filter { searchKey(it.name).contains(key) || (digits.isNotEmpty() && it.number.filter(Char::isDigit).contains(digits)) }
     }
-    LazyColumn {
-        items(shown, key = { "${it.id}-${it.number}" }) { contact ->
-            PersonRow(contact.name, listOf(contact.label, Phone.format(contact.number)).filter { it.isNotEmpty() }.joinToString(" · "), onClick = { Phone.call(context, contact.number) }) {
-                Text(contact.name.take(1).uppercase(), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    // Première ligne de chaque lettre ; les lettres sans contact restent grisées dans l'alphabet
+    val firstRow = remember(shown) {
+        buildMap { shown.forEachIndexed { i, contact -> putIfAbsent(Alphabet.letterOf(contact.name), i) } }
+    }
+    var finger by remember { mutableStateOf<Pair<Int, Float>?>(null) }
+    Box(Modifier.fillMaxSize()) {
+        Row(Modifier.fillMaxSize()) {
+            LazyColumn(Modifier.weight(1f), state = listState) {
+                items(shown, key = { "${it.id}-${it.number}" }) { contact ->
+                    PersonRow(contact.name, listOf(contact.label, Phone.format(contact.number)).filter { it.isNotEmpty() }.joinToString(" · "), onClick = { Phone.call(context, contact.number) }) {
+                        Avatar(contact.photo, contact.name)
+                    }
+                }
+            }
+            AlphabetBar(
+                enabled = Alphabet.LETTERS.map { it in firstRow },
+                onLetter = { index -> firstRow[Alphabet.LETTERS[index]]?.let { scope.launch { listState.scrollToItem(it) } } },
+                onFinger = { finger = it },
+                modifier = Modifier.width(32.dp).fillMaxHeight().padding(vertical = 8.dp),
+            )
+        }
+        finger?.let { (index, y) ->
+            Box(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .offset { IntOffset(x = -72.dp.roundToPx(), y = (y - 40.dp.toPx()).roundToInt().coerceAtLeast(0)) }
+                    .size(80.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(Alphabet.LETTERS[index].toString(), style = MaterialTheme.typography.displayMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
             }
         }
     }
