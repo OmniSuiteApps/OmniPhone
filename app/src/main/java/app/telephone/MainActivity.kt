@@ -57,6 +57,8 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         refresh++
+        // L'historique est sous les yeux : les appels manqués sont vus
+        if (isDefault()) MissedCalls.clear(this)
     }
 
     private fun handle(intent: Intent?) {
@@ -75,6 +77,7 @@ class MainActivity : ComponentActivity() {
         val PERMISSIONS = arrayOf(
             Manifest.permission.CALL_PHONE,
             Manifest.permission.READ_CALL_LOG,
+            Manifest.permission.WRITE_CALL_LOG,
             Manifest.permission.READ_CONTACTS,
             Manifest.permission.POST_NOTIFICATIONS,
         )

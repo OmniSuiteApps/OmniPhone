@@ -71,3 +71,22 @@ object Favorites {
 
     fun key(contact: Contact) = "${contact.id}|${contact.number}"
 }
+
+/** Numéros abrégés : un appui long sur 2 à 9, clavier vide, appelle le numéro choisi. */
+object SpeedDial {
+    val DIGITS = '2'..'9'
+    private const val KEY = "rapide"
+
+    fun decode(text: String): Map<Char, String> = text.split(';').mapNotNull { entry ->
+        val (digit, number) = entry.split('=', limit = 2).takeIf { it.size == 2 } ?: return@mapNotNull null
+        digit.singleOrNull()?.takeIf { it in DIGITS && number.isNotEmpty() }?.let { it to number }
+    }.toMap()
+
+    fun encode(slots: Map<Char, String>): String = slots.toSortedMap().entries.joinToString(";") { "${it.key}=${it.value}" }
+
+    fun load(context: Context): Map<Char, String> =
+        decode(context.getSharedPreferences("omniphone", Context.MODE_PRIVATE).getString(KEY, "").orEmpty())
+
+    fun save(context: Context, slots: Map<Char, String>) =
+        context.getSharedPreferences("omniphone", Context.MODE_PRIVATE).edit().putString(KEY, encode(slots)).apply()
+}

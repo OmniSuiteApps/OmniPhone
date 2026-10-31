@@ -29,4 +29,14 @@ class MatchingTest {
         assertEquals(Period.WEEK, Period.of(at(LocalDate.of(2026, 10, 26)), today, ZoneOffset.UTC)) // lundi
         assertEquals(Period.OLDER, Period.of(at(LocalDate.of(2026, 10, 25)), today, ZoneOffset.UTC)) // dimanche
     }
+
+    @Test
+    fun speedDialRoundTrip() {
+        val slots = mapOf('3' to "+33612345678", '2' to "0102030405")
+        assertEquals("2=0102030405;3=+33612345678", SpeedDial.encode(slots))
+        assertEquals(slots, SpeedDial.decode(SpeedDial.encode(slots)))
+        // 1 (messagerie), 0 et les entrées abîmées sont ignorés
+        assertEquals(mapOf('5' to "06"), SpeedDial.decode("1=0600;0=1;5=06;9=;x;77=1"))
+        assertEquals(emptyMap<Char, String>(), SpeedDial.decode(""))
+    }
 }

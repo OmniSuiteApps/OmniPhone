@@ -10,6 +10,8 @@ import android.content.Context
 import android.content.Intent
 import android.telecom.Call
 import android.telecom.CallEndpoint
+import android.os.VibrationEffect
+import android.os.VibratorManager
 import android.telecom.InCallService
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -24,21 +26,40 @@ object Ongoing {
     val muted = MutableStateFlow(false)
     var service: CallService? = null
 
-    /** Un appel qui sonne passe devant ; sinon le plus récent (l'autre est mis en attente par Android). */
-    fun current(): Call? = calls.value.let { list -> list.firstOrNull { it.details.state == Call.STATE_RINGING } ?: list.lastOrNull() }
+    /** Appels à montrer : une conférence compte pour un seul appel, sans ses participants. */
+    fun shown(): List<Call> = calls.value.filter { it.parent == null }
+
+    /** Un appel qui sonne passe devant ; sinon celui qui n'est pas en attente ; sinon le plus récent. */
+    fun current(): Call? = shown().let { list ->
+        list.firstOrNull { it.details.state == Call.STATE_RINGING } ?: list.lastOrNull { it.details.state != Call.STATE_HOLDING } ?: list.lastOrNull()
+    }
+
+    /** Les autres appels (en attente) pendant [current]. */
+    fun others(): List<Call> = current().let { c -> shown().filter { it != c } }
 }
 
 fun Call.title(): String =
-    details.contactDisplayName?.takeIf { it.isNotBlank() }
+    if (details.hasProperty(Call.Details.PROPERTY_CONFERENCE)) tr("Conférence", "Conference") else details.contactDisplayName?.takeIf { it.isNotBlank() }
         ?: details.handle?.schemeSpecificPart?.takeIf { it.isNotBlank() }?.let(Phone::format)
         ?: tr("Numéro masqué", "Private number")
 
 fun Call.hangUp() = if (details.state == Call.STATE_RINGING) reject(false, null) else disconnect()
 
 class CallService : InCallService() {
+    /** Appels sortants déjà décrochés : on ne vibre qu'une fois, pas à chaque reprise après une attente. */
+    private val answered = mutableSetOf<Call>()
+
     private val callback = object : Call.Callback() {
-        override fun onStateChanged(call: Call, state: Int) = changed()
+        override fun onStateChanged(call: Call, state: Int) {
+            if (state == Call.STATE_ACTIVE && call.details.callDirection == Call.Details.DIRECTION_OUTGOING && answered.add(call)) {
+                // Le téléphone est souvent à l'oreille : une courte vibration dit que le correspondant a décroché
+                getSystemService(VibratorManager::class.java).defaultVibrator.vibrate(VibrationEffect.createOneShot(120, VibrationEffect.DEFAULT_AMPLITUDE))
+            }
+            changed()
+        }
         override fun onDetailsChanged(call: Call, details: Call.Details) = changed()
+        override fun onCannedTextResponsesLoaded(call: Call, cannedTextResponses: List<String>) = changed()
+        override fun onConferenceableCallsChanged(call: Call, conferenceableCalls: List<Call>) = changed()
     }
 
     override fun onCreate() {
@@ -67,6 +88,7 @@ class CallService : InCallService() {
 
     override fun onCallRemoved(call: Call) {
         call.unregisterCallback(callback)
+        answered -= call
         Ongoing.calls.value -= call
         changed()
     }
